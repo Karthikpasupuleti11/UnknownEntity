@@ -185,9 +185,5 @@ This project is provided for research and educational purposes. Add an explicit 
 
 ---
 
-If you want, I can:
-- generate the README.md file in the repo (push as a commit),
-- draft example scripts for threshold selection and visualization,
-- or create a minimal quickstart notebook that demonstrates training → stats → detection on a single sentence.
 
-Which would you like next?
+
