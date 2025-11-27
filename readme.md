@@ -1,225 +1,193 @@
-generate a readme.md for this project from the below content-
-Quantum-Enhanced Convolutional Neural Networks for Image Anomaly Detection
+# 🕵️ Unknown Entity Detection using BERT & Mahalanobis Distance
 
-📌 Project Overview
+> A Post‑Hoc Out‑of‑Distribution (OOD) Detection System for Named Entity Recognition (NER).
 
-This project introduces a Hybrid Quantum-Classical Neural Network (HQC-CNN) designed to enhance industrial and medical anomaly detection. By replacing the traditional linear classifier head of a compact Convolutional Neural Network (CNN) with a Variational Quantum Circuit (VQC), we achieve superior performance in low-data regimes and better feature separability.
+This repository implements an uncertainty‑aware NER pipeline that detects "Unknown" or "Novel" entities (entities not seen during training) by combining a fine‑tuned BERT token classifier with a statistical Mahalanobis distance check over token embeddings.
 
-The core hypothesis is that quantum circuits operating in high-dimensional Hilbert spaces can learn more expressive decision boundaries than classical linear layers, especially when the feature vector is highly compressed (6 dimensions).
+---
 
-🚀 Key Features
+## 🚀 Project Overview
 
-Hybrid Architecture: LightweightCNN backbone + 6-Qubit PennyLane VQC.
+Standard NER models are closed‑set: they only recognize classes seen at training time (e.g., PER, LOC). When presented with a novel entity type (for example, ORG when the model was never trained on it), the model tends to mislabel or ignore it.
 
-Quantum Encoding: Angle Embedding ($R_Y$) mapping classical features to quantum states.
+This project implements a post‑hoc guard that:
+- Extracts contextual token embeddings from a fine‑tuned BERT model,
+- Builds per‑class statistical fingerprints (centroid + covariance),
+- Uses Mahalanobis distance at inference to flag tokens whose embeddings lie far outside the class "safe zone" as OOD / Unknown,
+- Adds lightweight heuristics (capitalized proper‑noun detection) to catch suspicious tokens predicted as background (`O`).
 
-End-to-End Training: Joint optimization of classical and quantum weights using PyTorch and PennyLane (Adjoint Differentiation).
+---
 
-Robust Evaluation: Benchmarked across 4 diverse datasets (Industrial, Medical, Structural).
+## 🧠 The Core Experiment: "The Lobotomy"
 
-Data Efficiency: Demonstrated significant accuracy gains in low-data regimes ($<350$ training samples).
+1. The "Lobotomy": We remove all Organization (ORG) labels from the CoNLL‑2003 training set.
+2. Training: Fine‑tune `bert-base-cased` for token classification on the restricted labels: PER, LOC, MISC (ORG is unseen).
+3. Test: Evaluate on data that still contains ORG tokens (e.g., "SpaceX", "Google").
+4. Goal: The system should flag these ORG tokens as UNKNOWN / Out‑of‑Distribution instead of incorrectly assigning them to a known class or leaving them as background.
 
-🏗️ Architecture
+---
 
-The model consists of two main components trained jointly:
+## 🛠️ Architecture & Flow
 
-Classical Backbone: A lightweight CNN with 3 Convolutional blocks and a dense bottleneck layer reducing the image to a 6-dimensional feature vector.
+1. Base model: `bert-base-cased` fine‑tuned for token classification on PER, LOC, MISC.
+2. Vector extraction: For each token at inference, extract the last hidden layer embedding (768 dims).
+3. Offline statistical profiling:
+   - Compute mean (centroid) and covariance matrix per known class (PER, LOC, MISC).
+   - Store these fingerprints (e.g., as .pkl files under saved_models/).
+4. Inference Guard:
+   - Mahalanobis distance of token embedding to predicted class centroid. If distance > threshold → label as UNKNOWN (OOD).
+   - Heuristic: If predicted as `O` but token is a capitalized proper noun → mark as Suspected Unknown.
 
-Quantum Head (VQC):
+---
 
-Input: 6 features encoded via Angle Embedding.
+## 📂 Directory Structure
 
-Ansatz: 2 layers of strongly entangling gates (Rotations + CNOT rings).
-
-Measurement: Expectation value of Pauli-Z on the first qubit.
-
-📊 Datasets & Results
-
-The Hybrid model outperformed the Classical baseline across all tested domains.
-
-Dataset
-
-Type
-
-Hybrid Accuracy
-
-Classical Accuracy
-
-Key Advantage
-
-Aluminium Foil
-
-Industrial Texture
-
-96.34%
-
-92.68%
-
-Superior texture separation
-
-Chest X-Ray
-
-Medical Imaging
-
-97.44%
-
-97.19%
-
-Better calibration & stability
-
-BUSI
-
-Ultrasound
-
-78.84%
-
-73.07%
-
-High precision in noisy data
-
-MVTec Mesh
-
-Structural
-
-88.57%
-
-85.71%
-
-High recall on structural defects
-
-🛠️ Tech Stack
-
-Languages: Python
-
-Deep Learning: PyTorch, Torchvision
-
-Quantum Computing: PennyLane
-
-Data Science: Scikit-Learn, NumPy, Pandas
-
-Visualization: Matplotlib, Seaborn
-
-Hardware: CUDA-enabled GPU support
-
-📂 Project Structure
-
-```
-├── HQC.jpg                 # Project image
-├── README.md               # Project documentation
-├── requirements.txt        # Python dependencies
-├── data/                   # Dataset folders (Normal/Anomaly)
-│   ├── anomaly_busi/       # BUSI ultrasound anomaly images
-│   ├── anomaly_foil/       # Aluminium foil anomaly images
-│   ├── anomaly_lungs/      # Chest X-ray anomaly images
-│   ├── anomaly_mesh/       # MVTec mesh anomaly images
-│   ├── anomaly_mvtec/      # MVTec anomaly images
-│   ├── full_data/          # Full dataset
-│   ├── normal_busi/        # BUSI ultrasound normal images
-│   ├── normal_foil/        # Aluminium foil normal images
-│   ├── normal_lungs/       # Chest X-ray normal images
-│   ├── normal_mesh/        # MVTec mesh normal images
-│   └── normal_mvtec/       # MVTec normal images
-├── src/                    # Source code
-│   ├── __init__.py
-│   ├── arch.py             # Architecture generation script
-│   ├── classical_model.py  # Baseline CNN model
-│   ├── compare.py          # Comparison and plotting script
-│   ├── config.py           # Hyperparameters
-│   ├── data_loader.py      # Balanced data loading logic
-│   ├── hybrid_model.py     # HQC-CNN model definition
-│   ├── main.py             # Main script for hybrid model
-│   ├── main_classical.py   # Main script for classical model
-│   ├── predict.py          # Prediction script for hybrid model
-│   ├── predict_classical.py # Prediction script for classical model
-│   ├── test_classical.py   # Testing script for classical model
-│   ├── test_classifier.py  # Testing script for hybrid model
-│   ├── train_classical.py  # Training script for classical model
-│   ├── train_classifier.py # Training script for hybrid model
-│   ├── utils.py            # Metrics and visualization tools
-│   ├── vqc.py              # PennyLane Quantum Circuit
-│   └── __pycache__/        # Python cache
-├── results/                # Saved models and logs for initial run
-│   ├── classical_architecture.txt
-│   ├── classical_training.log
-│   ├── hybrid_architecture.txt
-│   ├── training.log
-│   ├── models/
-│   └── plots/
-├── results_2/              # Results for Chest X-ray
-├── results_3/              # Results for Chest X-ray
-├── results_4/              # Results for BUSI Ultrasound
-├── results_5/              # Results for MVTec Mesh
-├── refer/                  # Reference plots
-│   ├── Classical_PR_Curves_Grid.png
-│   ├── Classical_ROC_Curves_Grid.png
-│   ├── Hybrid_PR_Curves_Grid.png
-│   ├── Hybrid_ROC_Curves_Grid.png
-│   ├── Aluminium_Foil/
-│   ├── BUSI_Ultrasound/
-│   ├── Chest_XRay/
-│   └── MVTec_Mesh/
-└── ALL/                    # Aggregated results and plots
-    ├── FINAL_AGGREGATED_RESULTS.png
-    ├── grid_Aluminium_Foil.png
-    ├── grid_BUSI_Ultrasound.png
-    ├── grid_Chest_XRay.png
-    ├── grid_MVTec_Mesh.png
-    └── Aggregated_Plots/
-        ├── Classical_Confusion_Matrices_Grid.png
-        ├── Classical_Consolidated_PR.png
-        ├── Classical_Consolidated_ROC.png
-        ├── Classical_Metrics_Bar_Chart_Aggregated.png
-        ├── Classical_tSNE_Grid.png
-        ├── Hybrid_Confusion_Matrices_Grid.png
-        ├── Hybrid_Consolidated_PR.png
-        ├── Hybrid_Consolidated_ROC.png
-        ├── Hybrid_Metrics_Bar_Chart_Aggregated.png
-        └── Hybrid_tSNE_Grid.png
+```text
+UnknownEntityProject/
+│
+├── src/
+│   ├── dataset_setup.py   # Downloads CoNLL-2003 & removes 'ORG' tags (The Lobotomy)
+│   ├── trainer.py         # Fine-tunes BERT on the restricted dataset
+│   ├── vector_utils.py    # Extracts embeddings & computes Class Centroids/Covariance
+│   ├── detector.py        # The Guard: Logic for Distance & Heuristic checks
+│   ├── evaluate.py        # Runs accuracy metrics on the Test Set
+│   └── config.py          # Global settings (Thresholds, Hyperparameters)
+│
+├── saved_models/          # Trained BERT model & statistical fingerprints (.pkl)
+├── notebooks/             # Jupyter notebooks for visualization and analysis
+├── requirements.txt       # Project dependencies
+└── main.py                # Main CLI entry point
 ```
 
+---
 
-🚀 Getting Started
+## 💻 Installation & Setup
 
-Prerequisites
+Clone the repository:
 
-pip install torch torchvision pennylane scikit-learn matplotlib seaborn numpy
+```bash
+git clone https://github.com/Karthikpasupuleti11/UnknownEntity.git
+cd UnknownEntity
+```
 
+(Recommended) Create a virtual environment:
 
-Training
+```bash
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# macOS / Linux
+source venv/bin/activate
+```
 
-To train the Hybrid model:
+Install dependencies:
 
-python -m src.main --mode train
+```bash
+pip install -r requirements.txt
+```
 
+Notes:
+- For full training and faster runs, a GPU is highly recommended.
+- The project uses Hugging Face datasets & transformers to download CoNLL‑2003 and BERT.
 
-To train the Classical baseline:
+---
 
-python -m src.main_classical --mode train
+## ⚡ Usage Guide
 
+Phase 1: Train the model (downloads data, removes ORG, fine‑tunes BERT):
 
-Evaluation & Inference
+```bash
+python main.py --train
+```
 
-To generate the comparison plots and metrics:
+Phase 2: Compute fingerprints (centroids & covariances for each known class):
 
-python -m src.generate_all_plots
+```bash
+python main.py --stats
+# or
+python -m src.vector_utils    # depending on the CLI wrappers provided
+```
 
+Phase 3: Real‑time prediction / demo:
 
-📈 Visualizations
+```bash
+python main.py --predict "Elon Musk founded SpaceX in California."
+```
 
-The project includes a suite of analytical plots located in ALL/Aggregated_Plots:
+Expected output (example):
 
-ROC & PR Curves: Demonstrating superior AUC and precision-recall trade-offs.
+```
+Elon Musk: PER (Accepted)
+California: LOC (Accepted)
+SpaceX: UNKNOWN (Suspected)  # Successfully detected as OOD
+```
 
-t-SNE Plots: Visualizing the tighter clustering of quantum embeddings.
+Phase 4: Full evaluation (run the evaluation script against CoNLL‑2003 test set):
 
-Confusion Matrices: Highlighting reduced false positives in the hybrid model.
+```bash
+python -m src.evaluate
+```
 
-📜 Citation
+---
 
-If you use this code for your research, please cite the associated conference paper:
+## 📊 Example Results (1 Epoch, CPU)
 
-"Quantum-Enhanced Convolutional Neural Networks for Image Anomaly Detection"
+- Known Entity Accuracy: 62.58%  
+  (How accurate the model is on PER, LOC, MISC labels)
+- Unknown Detection Rate: 36.92%  
+  (Percent of hidden ORG tokens successfully flagged as Unknown)
 
-📄 License
+These are baseline results intended to demonstrate the pipeline. Expect much better performance after multiple epochs and GPU training.
 
-This project is licensed under the MIT License.
+---
+
+## 🔍 Key Implementation Files (high level)
+
+- src/dataset_setup.py — download CoNLL‑2003, remove ORG labels from training set, produce restricted dataset.
+- src/trainer.py — BERT fine‑tuning code (token classification head).
+- src/vector_utils.py — embedding extraction, centroid and covariance computation, serialization to disk.
+- src/detector.py — Mahalanobis distance check + heuristic rules applied at inference time.
+- src/evaluate.py — accuracy, OOD detection metrics, confusion matrices.
+- src/config.py — hyperparameters, thresholds, file paths.
+
+---
+
+## 🔮 Future Work
+
+- Contrastive learning (Supervised Contrastive Loss) to better separate classes in embedding space.
+- Energy‑based scoring as an alternative to Mahalanobis distance.
+- Active learning loop: present flagged Unknowns to annotators, expand label set iteratively.
+- Better heuristics and calibrated thresholds per class; use validation set for threshold selection.
+
+---
+
+## 📜 Acknowledgments
+
+- Dataset: CoNLL‑2003 via Hugging Face.
+- Model: BERT (Google).
+- Technique: Mahalanobis Distance for OOD detection.
+- Inspired by prior work on post‑hoc OOD detection for classification and token classification tasks.
+
+---
+
+## Contributing
+
+Contributions welcome — open issues or PRs. If you make changes to the pipeline, please:
+1. Add or update unit/integration tests where appropriate.
+2. Update notebooks and eval scripts to reflect new metrics.
+3. Document new CLI flags in main.py.
+
+---
+
+## License
+
+This project is provided for research and educational purposes. Add an explicit license file (e.g., MIT) to clarify usage.
+
+---
+
+If you want, I can:
+- generate the README.md file in the repo (push as a commit),
+- draft example scripts for threshold selection and visualization,
+- or create a minimal quickstart notebook that demonstrates training → stats → detection on a single sentence.
+
+Which would you like next?
